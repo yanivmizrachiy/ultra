@@ -1,0 +1,171 @@
+<!doctype html><html lang="he" dir="rtl"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<title>Ultra</title>
+<link rel="manifest" href="./manifest.webmanifest"/>
+<meta name="theme-color" content="#0b2a6f"/>
+<style>
+:root{--bg:#06142f;--card:#0b1e48;--card2:#0c2a66;--txt:#eaf2ff;--mut:#a9c2ff;--acc:#2f7bff;--ok:#22c55e;--bad:#ef4444}
+*{box-sizing:border-box} body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial; background:radial-gradient(1200px 600px at 20% 0%, #123a9a 0%, var(--bg) 55%); color:var(--txt)}
+header{position:sticky;top:0;z-index:5;background:linear-gradient(180deg,rgba(6,20,47,.95),rgba(6,20,47,.65));backdrop-filter:blur(10px);padding:14px 14px 10px;border-bottom:1px solid rgba(169,194,255,.15)}
+h1{margin:0;font-size:20px;display:flex;gap:10px;align-items:center}
+.badge{font-size:12px;color:var(--mut);border:1px solid rgba(169,194,255,.18);padding:2px 8px;border-radius:999px}
+main{padding:14px;max-width:920px;margin:0 auto}
+.grid{display:grid;gap:12px}
+.card{background:linear-gradient(180deg,rgba(11,30,72,.92),rgba(11,30,72,.72));border:1px solid rgba(169,194,255,.16);border-radius:18px;box-shadow:0 10px 30px rgba(0,0,0,.25);padding:14px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.btn{appearance:none;border:0;border-radius:14px;padding:12px 14px;font-weight:700;color:var(--txt);background:linear-gradient(180deg,var(--card2),#0a1f4d);border:1px solid rgba(169,194,255,.18);box-shadow:0 6px 18px rgba(0,0,0,.25);cursor:pointer;display:inline-flex;gap:10px;align-items:center}
+.btn:active{transform:translateY(1px)}
+.btn.acc{background:linear-gradient(180deg,#2f7bff,#1b4fd6)}
+.btn.ghost{background:transparent}
+.small{font-size:12px;color:var(--mut)}
+.tabs{display:flex;gap:8px;flex-wrap:wrap}
+.tab{padding:10px 12px;border-radius:999px;border:1px solid rgba(169,194,255,.18);background:rgba(11,30,72,.55);color:var(--mut);cursor:pointer;font-weight:700}
+.tab.active{background:rgba(47,123,255,.18);color:var(--txt);border-color:rgba(47,123,255,.35)}
+.viewer{width:100%;height:min(62vh,560px);border-radius:16px;border:1px solid rgba(169,194,255,.16);background:#071634;overflow:hidden}
+.pill{display:inline-flex;gap:8px;align-items:center;padding:6px 10px;border-radius:999px;border:1px solid rgba(169,194,255,.18);color:var(--mut);font-size:12px}
+.pill.ok{color:#bfffd3;border-color:rgba(34,197,94,.35);background:rgba(34,197,94,.08)}
+.pill.bad{color:#ffd1d1;border-color:rgba(239,68,68,.35);background:rgba(239,68,68,.08)}
+footer{padding:18px 14px 26px;color:var(--mut);text-align:center;font-size:12px}
+</style></head><body>
+<header><h1>Ultra <span class="badge">קובץ · שיתוף · מהיר</span></h1></header>
+<main class="grid">
+  <section class="card">
+    <div class="row" style="justify-content:space-between">
+      <div class="row">
+        <button class="btn acc" id="pickBtn">📎 בחירת קובץ</button>
+        <button class="btn" id="shareBtn" disabled>📤 שיתוף</button>
+        <button class="btn" id="saveBtn" disabled>💾 שמירה</button>
+        <button class="btn ghost" id="clearBtn" disabled>🧹 ניקוי</button>
+      </div>
+      <span id="compat" class="pill">בודק יכולות…</span>
+    </div>
+    <div style="height:10px"></div>
+    <div class="tabs">
+      <button class="tab active" data-filter="all">הכל</button>
+      <button class="tab" data-filter="pdf">PDF</button>
+      <button class="tab" data-filter="image">תמונות</button>
+    </div>
+    <div style="height:10px"></div>
+    <input id="fileInput" type="file" style="display:none" accept="application/pdf,image/*"/>
+    <div class="small" id="meta">לא נבחר קובץ עדיין.</div>
+  </section>
+
+  <section class="card">
+    <div class="small">תצוגה</div>
+    <div style="height:8px"></div>
+    <iframe id="pdfFrame" class="viewer" style="display:none"></iframe>
+    <img id="imgView" class="viewer" style="display:none;object-fit:contain"/>
+    <div id="empty" class="viewer" style="display:flex;align-items:center;justify-content:center;color:rgba(169,194,255,.7);font-weight:700">
+      בחר קובץ כדי לצפות בו כאן
+    </div>
+  </section>
+</main>
+<footer>Ultra — PWA | עובד מהר, מותאם לנייד</footer>
+
+<script>
+const fileInput=document.getElementById('fileInput');
+const pickBtn=document.getElementById('pickBtn');
+const shareBtn=document.getElementById('shareBtn');
+const saveBtn=document.getElementById('saveBtn');
+const clearBtn=document.getElementById('clearBtn');
+const pdfFrame=document.getElementById('pdfFrame');
+const imgView=document.getElementById('imgView');
+const empty=document.getElementById('empty');
+const meta=document.getElementById('meta');
+const compat=document.getElementById('compat');
+const tabs=[...document.querySelectorAll('.tab')];
+
+let currentFile=null, currentUrl=null, currentKind=null;
+
+function setCompat(){
+  const canShare=!!navigator.share;
+  const ok=canShare;
+  compat.textContent = ok ? 'שיתוף נתמך ✅' : 'שיתוף לא זמין (עדיין אפשר שמירה) ⚠️';
+  compat.className = 'pill ' + (ok ? 'ok' : 'bad');
+}
+setCompat();
+
+function reset(){
+  currentFile=null; currentKind=null;
+  if(currentUrl){ URL.revokeObjectURL(currentUrl); currentUrl=null; }
+  pdfFrame.style.display='none'; imgView.style.display='none'; empty.style.display='flex';
+  pdfFrame.src='about:blank'; imgView.src='';
+  meta.textContent='לא נבחר קובץ עדיין.';
+  shareBtn.disabled=true; saveBtn.disabled=true; clearBtn.disabled=true;
+}
+
+function show(file){
+  reset();
+  currentFile=file;
+  const name=file.name||'ללא_שם';
+  const type=file.type||'';
+  const size=(file.size/1024/1024).toFixed(2)+'MB';
+  meta.textContent=`נבחר: ${name} · ${type||'unknown'} · ${size}`;
+  currentUrl=URL.createObjectURL(file);
+
+  const isPdf = type==='application/pdf' || name.toLowerCase().endsWith('.pdf');
+  const isImg = type.startsWith('image/');
+  currentKind = isPdf ? 'pdf' : (isImg ? 'image' : 'other');
+
+  if(isPdf){
+    pdfFrame.src=currentUrl;
+    pdfFrame.style.display='block';
+    empty.style.display='none';
+  }else if(isImg){
+    imgView.src=currentUrl;
+    imgView.style.display='block';
+    empty.style.display='none';
+  }else{
+    empty.textContent='סוג קובץ לא נתמך לתצוגה. אפשר לשמור/לשתף.';
+  }
+
+  shareBtn.disabled=false;
+  saveBtn.disabled=false;
+  clearBtn.disabled=false;
+}
+
+pickBtn.addEventListener('click',()=>fileInput.click());
+fileInput.addEventListener('change',e=>{
+  const f=e.target.files && e.target.files[0];
+  if(f) show(f);
+});
+
+async function doShare(){
+  if(!currentFile) return;
+  try{
+    if(navigator.canShare && navigator.canShare({files:[currentFile]})){
+      await navigator.share({title:'Ultra', text:'שיתוף קובץ', files:[currentFile]});
+    }else if(navigator.share){
+      await navigator.share({title:'Ultra', text:'שיתוף קובץ: '+(currentFile.name||'')});
+    }else{
+      alert('שיתוף לא נתמך במכשיר הזה. השתמש בשמירה ואז שתף מהקבצים.');
+    }
+  }catch(e){ /* user cancelled */ }
+}
+shareBtn.addEventListener('click',doShare);
+
+function doSave(){
+  if(!currentFile || !currentUrl) return;
+  const a=document.createElement('a');
+  a.href=currentUrl;
+  a.download=currentFile.name || 'file';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+saveBtn.addEventListener('click',doSave);
+
+clearBtn.addEventListener('click',reset);
+
+tabs.forEach(t=>t.addEventListener('click',()=>{
+  tabs.forEach(x=>x.classList.remove('active')); t.classList.add('active');
+  const f=t.dataset.filter;
+  const acc = (f==='pdf') ? 'application/pdf' : (f==='image' ? 'image/*' : 'application/pdf,image/*');
+  fileInput.setAttribute('accept', acc);
+}));
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=> navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+}
+</script>
+</body></html>
